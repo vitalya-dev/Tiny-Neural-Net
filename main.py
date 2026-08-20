@@ -38,3 +38,27 @@ def load_mnist_idx(train_images_path, train_labels_path, test_images_path, test_
     X_test = X_test / 255.0
 
     return X_train, Y_train, X_test, Y_test
+
+
+def main():
+    X_train, Y_train, X_test, Y_test = load_mnist_idx(
+        "train-images-idx3-ubyte",
+        "train-labels-idx1-ubyte",
+        "t10k-images-idx3-ubyte",
+        "t10k-labels-idx1-ubyte"
+    )
+
+    print("X_train:", X_train.shape)
+    print("Y_train:", Y_train.shape)
+    print("X_test: ", X_test.shape)
+    print("Y_test: ", Y_test.shape)
+
+    print()
+    print("Первая метка:", Y_train[0])
+    print("Первые 10 пикселей:", X_train[:10, 0])
+    print("Минимальный пиксель:", X_train.min())
+    print("Максимальный пиксель:", X_train.max())
+
+
+if __name__ == "__main__":
+    main()
