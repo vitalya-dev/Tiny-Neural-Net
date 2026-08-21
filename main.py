@@ -39,6 +39,27 @@ def load_mnist_idx(train_images_path, train_labels_path, test_images_path, test_
 
     return X_train, Y_train, X_test, Y_test
 
+def init_params():
+    # W1 - матрица весов от входа (784) к скрытому слою (10 нейронов)
+    # np.random.rand генерирует числа от 0 до 1. 
+    # Вычитаем 0.5, чтобы получить значения от -0.5 до 0.5
+    W1 = np.random.rand(10, 784) - 0.5
+    
+    # b1 - вектор смещений для скрытого слоя (10 строк, 1 колонка)
+    b1 = np.random.rand(10, 1) - 0.5
+    
+    # W2 - матрица весов от скрытого слоя (10) к выходному (10 цифр)
+    W2 = np.random.rand(10, 10) - 0.5
+    
+    # b2 - вектор смещений для выходного слоя (10 строк, 1 колонка)
+    b2 = np.random.rand(10, 1) - 0.5
+    
+    return W1, b1, W2, b2
+
+def ReLU(Z):
+    # np.maximum сравнивает каждый элемент матрицы с нулем
+    # Если число меньше нуля, оно станет нулем.
+    return np.maximum(Z, 0)
 
 def main():
     X_train, Y_train, X_test, Y_test = load_mnist_idx(
