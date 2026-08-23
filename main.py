@@ -116,6 +116,16 @@ def backward_prop(Z1, A1, Z2, A2, W1, W2, X, Y):
     # Возвращаем градиенты (направления и силу изменения весов)
     return dW1, db1, dW2, db2
 
+def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
+    # Обновляем параметры, вычитая градиент, умноженный на скорость обучения (alpha)
+    W1 = W1 - alpha * dW1
+    b1 = b1 - alpha * db1    
+    W2 = W2 - alpha * dW2  
+    b2 = b2 - alpha * db2    
+    
+    # Возвращаем новые, немного улучшенные веса и смещения
+    return W1, b1, W2, b2
+
 def main():
     X_train, Y_train, X_test, Y_test = load_mnist_idx(
         "train-images-idx3-ubyte",
