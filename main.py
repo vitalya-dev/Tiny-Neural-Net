@@ -181,4 +181,22 @@ def gradient_descent(X, Y, alpha, iterations):
     return W1, b1, W2, b2
 
 if __name__ == "__main__":
-    main()
+    # 1. Указываем пути к бинарным файлам MNIST
+    # Убедись, что имена файлов совпадают с теми, что скачаны у тебя
+    train_images_path = 'train-images-idx3-ubyte'
+    train_labels_path = 'train-labels-idx1-ubyte'
+    test_images_path = 't10k-images-idx3-ubyte'
+    test_labels_path = 't10k-labels-idx1-ubyte'
+    
+    print("Загрузка данных...")
+    # 2. Вызываем нашу функцию для чтения IDX файлов
+    X_train, Y_train, X_test, Y_test = load_mnist_idx(
+        train_images_path, train_labels_path, test_images_path, test_labels_path
+    )
+    
+    print("Данные загружены. Начинаем обучение...")
+    # 3. Запускаем градиентный спуск
+    # alpha = 0.1 (скорость обучения), iterations = 500 (количество эпох)
+    W1, b1, W2, b2 = gradient_descent(X_train, Y_train, 0.10, 500)
+    
+    print("Обучение завершено, бро! Твоя первая нейросеть готова.")
