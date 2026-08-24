@@ -180,23 +180,40 @@ def gradient_descent(X, Y, alpha, iterations):
     # Возвращаем натренированные веса! Теперь они содержат знания сети.
     return W1, b1, W2, b2
 
+def make_predictions(X, W1, b1, W2, b2):
+    # Запускаем только прямое распространение (без обучения) на новых данных X
+    _, _, _, A2 = forward_prop(W1, b1, W2, b2, X)
+    
+    # Превращаем вероятности в конкретные цифры-ответы
+    predictions = get_predictions(A2)
+    
+    # Возвращаем массив с предсказанными цифрами
+    return predictions
+
+
 if __name__ == "__main__":
-    # 1. Указываем пути к бинарным файлам MNIST
-    # Убедись, что имена файлов совпадают с теми, что скачаны у тебя
+    # Указываем пути к бинарным файлам MNIST
     train_images_path = 'train-images-idx3-ubyte'
     train_labels_path = 'train-labels-idx1-ubyte'
     test_images_path = 't10k-images-idx3-ubyte'
     test_labels_path = 't10k-labels-idx1-ubyte'
     
     print("Загрузка данных...")
-    # 2. Вызываем нашу функцию для чтения IDX файлов
     X_train, Y_train, X_test, Y_test = load_mnist_idx(
         train_images_path, train_labels_path, test_images_path, test_labels_path
     )
     
     print("Данные загружены. Начинаем обучение...")
-    # 3. Запускаем градиентный спуск
-    # alpha = 0.1 (скорость обучения), iterations = 500 (количество эпох)
+    # Запускаем обучение на 500 итераций
     W1, b1, W2, b2 = gradient_descent(X_train, Y_train, 0.10, 500)
+    print("Обучение завершено!")
     
-    print("Обучение завершено, бро! Твоя первая нейросеть готова.")
+    print("---")
+    print("Начинаем тестирование на новых данных (X_test)...")
+    
+    # Делаем предсказания на тестовых данных, которые сеть еще не видела
+    test_predictions = make_predictions(X_test, W1, b1, W2, b2)
+    
+    # Считаем и выводим итоговую точность
+    test_acc = get_accuracy(test_predictions, Y_test)
+    print(f"Итоговая точность на тестовой выборке: {test_acc * 100:.2f}%")
