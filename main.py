@@ -145,6 +145,40 @@ def main():
     print("Минимальный пиксель:", X_train.min())
     print("Максимальный пиксель:", X_train.max())
 
+def get_predictions(A2):
+    # Функция argmax находит индекс самого большого числа в столбце.
+    # Поскольку индексы совпадают с цифрами (0-9), это и есть предсказанная цифра.
+    return np.argmax(A2, 0)
+
+def get_accuracy(predictions, Y):
+    # Сравниваем массивы предсказаний и правильных ответов (получаем значения True/False).
+    # Суммируем совпадения и делим на общее число картинок.
+    return np.sum(predictions == Y) / Y.size
+
+
+def gradient_descent(X, Y, alpha, iterations):
+    # 1. Задаем стартовые случайные веса и смещения
+    W1, b1, W2, b2 = init_params()
+    
+    # 2. Запускаем цикл обучения
+    for i in range(iterations):
+        # Шаг 1: Прямое распространение (сеть делает предсказание)
+        Z1, A1, Z2, A2 = forward_prop(W1, b1, W2, b2, X)
+        
+        # Шаг 2: Обратное распространение (сеть считает ошибки и градиенты)
+        dW1, db1, dW2, db2 = backward_prop(Z1, A1, Z2, A2, W1, W2, X, Y)
+        
+        # Шаг 3: Обновление параметров (сеть корректирует веса)
+        W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
+        
+        # Каждые 10 итераций выводим прогресс на экран
+        if i % 10 == 0:
+            print("Итерация: ", i)
+            predictions = get_predictions(A2)
+            print("Точность на обучающей выборке: ", get_accuracy(predictions, Y))
+            
+    # Возвращаем натренированные веса! Теперь они содержат знания сети.
+    return W1, b1, W2, b2
 
 if __name__ == "__main__":
     main()
