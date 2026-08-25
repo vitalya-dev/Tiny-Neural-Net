@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import struct
 
+import json
+
 def load_mnist_idx(train_images_path, train_labels_path, test_images_path, test_labels_path):
     # Вспомогательная функция для чтения одного IDX файла
     def read_idx(filename):
@@ -180,6 +182,23 @@ def gradient_descent(X, Y, alpha, iterations):
     # Возвращаем натренированные веса! Теперь они содержат знания сети.
     return W1, b1, W2, b2
 
+def save_weights(W1, b1, W2, b2, filename="weights.json"):
+    import json
+    # Превращаем numpy матрицы в обычные списки Python, 
+    # потому что JSON не умеет работать с сырыми массивами numpy
+    data = {
+        "W1": W1.tolist(),
+        "b1": b1.tolist(),
+        "W2": W2.tolist(),
+        "b2": b2.tolist()
+    }
+    
+    # Открываем файл на запись ('w' - write) и сохраняем туда наши данные
+    with open(filename, 'w') as f:
+        json.dump(data, f)
+    
+    print(f"Веса успешно сохранены в файл: {filename}")
+
 def make_predictions(X, W1, b1, W2, b2):
     # Запускаем только прямое распространение (без обучения) на новых данных X
     _, _, _, A2 = forward_prop(W1, b1, W2, b2, X)
@@ -205,7 +224,7 @@ if __name__ == "__main__":
     
     print("Данные загружены. Начинаем обучение...")
     # Запускаем обучение на 500 итераций
-    W1, b1, W2, b2 = gradient_descent(X_train, Y_train, 0.10, 500)
+    W1, b1, W2, b2 = gradient_descent(X_train, Y_train, 0.10, 1000)
     print("Обучение завершено!")
     
     print("---")
@@ -217,3 +236,7 @@ if __name__ == "__main__":
     # Считаем и выводим итоговую точность
     test_acc = get_accuracy(test_predictions, Y_test)
     print(f"Итоговая точность на тестовой выборке: {test_acc * 100:.2f}%")
+    
+    print("---")
+    # Сохраняем натренированные веса для нашего будущего веб-интерфейса
+    save_weights(W1, b1, W2, b2, "weights.json")
