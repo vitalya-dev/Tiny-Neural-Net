@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Распознавание цифр (MNIST)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 50px;
+            background-color: #f4f4f9;
+        }
+        /* Стили для нашего холста: делаем ему строгую черную рамку */
+        #paintCanvas {
+            border: 2px solid #333;
+            background-color: black;
+            cursor: crosshair; /* Курсор в виде крестика для удобного рисования */
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #ff4757;
+            color: white;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #ff6b81;
+        }
+        #predictionText {
+            margin-top: 20px;
+            font-size: 24px;
+            color: #2f3542;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Нарисуй цифру от 0 до 9</h1>
+    
+    <!-- Наш холст для рисования размером 200x200 пикселей -->
+    <canvas id="paintCanvas" width="200" height="200"></canvas>
+    
+    <div class="controls">
+        <button id="clearBtn">Очистить холст</button>
+    </div>
+    
+    <!-- Здесь будет появляться предсказание нейросети -->
+    <h2 id="predictionText">Предсказание: ?</h2>
+
+    <!-- Подключаем будущий скрипт с логикой (пока его нет, но скоро мы его напишем) -->
+    <script src="app.js"></script>
+
+</body>
+</html>
