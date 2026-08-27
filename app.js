@@ -81,6 +81,39 @@ function initApp() {
     });
 }
 
+
+function getPixels(canvas) {
+    // 1. Создаем временный холст нужного размера (28x28)
+    const scaledCanvas = document.createElement('canvas');
+    scaledCanvas.width = 28;
+    scaledCanvas.height = 28;
+    const scaledCtx = scaledCanvas.getContext('2d');
+    
+    // 2. Рисуем большую картинку на маленьком холсте (сжатие)
+    scaledCtx.drawImage(canvas, 0, 0, 28, 28);
+    
+    // 3. Получаем данные пикселей
+    // getImageData возвращает массив, где каждый пиксель описан 4 числами: 
+    // Красный (R), Зеленый (G), Синий (B) и Прозрачность (Alpha).
+    const imageData = scaledCtx.getImageData(0, 0, 28, 28);
+    const data = imageData.data;
+    
+    // 4. Массив для нашей нейросети (784 элемента)
+    const pixels = [];
+    
+    // 5. Проходим по массиву с шагом 4, чтобы брать только первый цвет (Красный)
+    // Так как мы рисуем белым по черному, R, G и B у нас одинаковые (255 или 0)
+    for (let i = 0; i < data.length; i += 4) {
+        // Берем значение цвета (от 0 до 255) и делим на 255, 
+        // чтобы получить нормализованное значение (от 0.0 до 1.0)
+        const normalizedPixel = data[i] / 255.0;
+        pixels.push(normalizedPixel);
+    }
+    
+    // Возвращаем готовый массив из 784 чисел
+    return pixels;
+}
+
 // Запускаем наше приложение, как только страница загрузится
 window.onload = initApp;
 
