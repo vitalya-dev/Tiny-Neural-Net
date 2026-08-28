@@ -107,34 +107,71 @@ async function initApp() {
 
 
 function getPixels(canvas) {
-    // 1. Создаем временный холст нужного размера (28x28)
-    const scaledCanvas = document.createElement('canvas');
-    scaledCanvas.width = 28;
-    scaledCanvas.height = 28;
-    const scaledCtx = scaledCanvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+
+    // 1. Ищем границы нашего рисунка (крайние точки, где есть белый цвет)
+    let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+    let isEmpty = true;
+
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+            // Проверяем красный канал (так как цвет белый, R=255)
+            const red = data[(y * canvas.width + x) * 4]; 
+            if (red > 0) { // Если пиксель не черный
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                isEmpty = false;
+            }
+        }
+    }
+
+    // Если холст пустой (ничего не нарисовано), возвращаем массив из 784 нулей
+    if (isEmpty) return new Array(784).fill(0);
+
+    // Вычисляем ширину и высоту нарисованной цифры
+    const digitWidth = maxX - minX + 1;
+    const digitHeight = maxY - minY + 1;
+
+    // 2. Вырезаем цифру на временный холст
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = digitWidth;
+    croppedCanvas.height = digitHeight;
+    const croppedCtx = croppedCanvas.getContext('2d');
+    croppedCtx.drawImage(canvas, minX, minY, digitWidth, digitHeight, 0, 0, digitWidth, digitHeight);
+
+    // 3. Вычисляем масштаб, чтобы вписать цифру в размер 20x20 пикселей, сохраняя пропорции
+    const scale = 20 / Math.max(digitWidth, digitHeight);
+    const scaledWidth = digitWidth * scale;
+    const scaledHeight = digitHeight * scale;
+
+    // 4. Создаем финальный холст 28x28 (как ожидает нейросеть)
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = 28;
+    finalCanvas.height = 28;
+    const finalCtx = finalCanvas.getContext('2d');
     
-    // 2. Рисуем большую картинку на маленьком холсте (сжатие)
-    scaledCtx.drawImage(canvas, 0, 0, 28, 28);
-    
-    // 3. Получаем данные пикселей
-    // getImageData возвращает массив, где каждый пиксель описан 4 числами: 
-    // Красный (R), Зеленый (G), Синий (B) и Прозрачность (Alpha).
-    const imageData = scaledCtx.getImageData(0, 0, 28, 28);
-    const data = imageData.data;
-    
-    // 4. Массив для нашей нейросети (784 элемента)
+    // Обязательно заливаем фон черным
+    finalCtx.fillStyle = 'black';
+    finalCtx.fillRect(0, 0, 28, 28);
+
+    // 5. Размещаем сжатую цифру ровно по центру холста 28x28
+    const dx = (28 - scaledWidth) / 2;
+    const dy = (28 - scaledHeight) / 2;
+    finalCtx.drawImage(croppedCanvas, 0, 0, digitWidth, digitHeight, dx, dy, scaledWidth, scaledHeight);
+
+    // 6. Получаем финальные пиксели
+    const finalData = finalCtx.getImageData(0, 0, 28, 28).data;
     const pixels = [];
     
-    // 5. Проходим по массиву с шагом 4, чтобы брать только первый цвет (Красный)
-    // Так как мы рисуем белым по черному, R, G и B у нас одинаковые (255 или 0)
-    for (let i = 0; i < data.length; i += 4) {
-        // Берем значение цвета (от 0 до 255) и делим на 255, 
-        // чтобы получить нормализованное значение (от 0.0 до 1.0)
-        const normalizedPixel = data[i] / 255.0;
-        pixels.push(normalizedPixel);
+    // Собираем значения от 0 до 1
+    for (let i = 0; i < finalData.length; i += 4) {
+        pixels.push(finalData[i] / 255.0);
     }
-    
-    // Возвращаем готовый массив из 784 чисел
+
     return pixels;
 }
 
