@@ -224,7 +224,7 @@ if __name__ == "__main__":
     
     print("Данные загружены. Начинаем обучение...")
     # Запускаем обучение на 500 итераций
-    W1, b1, W2, b2 = gradient_descent(X_train, Y_train, 0.10, 1000)
+    W1, b1, W2, b2 = gradient_descent(X_train, Y_train, 0.10, 10000)
     print("Обучение завершено!")
     
     print("---")
