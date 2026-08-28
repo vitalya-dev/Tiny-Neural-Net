@@ -38,17 +38,24 @@ function stopDrawing(ctx) {
 }
 
 function clearCanvas(canvas, ctx) {
-    // Заливаем весь холст черным цветом (это важно для нейросети)
+    // Очищаем большой основной холст
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Сбрасываем текст с предсказанием к начальному виду
+    // Находим наш новый маленький холст и тоже заливаем его черным
+    const networkCanvas = document.getElementById('networkInputCanvas');
+    if (networkCanvas) {
+        const networkCtx = networkCanvas.getContext('2d');
+        networkCtx.fillStyle = 'black';
+        networkCtx.fillRect(0, 0, 28, 28);
+    }
+    
+    // Сбрасываем текст с предсказанием
     const predictionText = document.getElementById('predictionText');
     if (predictionText) {
         predictionText.innerText = "Предсказание: ?";
     }
 }
-
 
 async function initApp() {
     const { canvas, ctx } = setupCanvas();
@@ -111,15 +118,14 @@ function getPixels(canvas) {
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imgData.data;
 
-    // 1. Ищем границы нашего рисунка (крайние точки, где есть белый цвет)
+    // 1. Ищем границы рисунка
     let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
     let isEmpty = true;
 
     for (let y = 0; y < canvas.height; y++) {
         for (let x = 0; x < canvas.width; x++) {
-            // Проверяем красный канал (так как цвет белый, R=255)
             const red = data[(y * canvas.width + x) * 4]; 
-            if (red > 0) { // Если пиксель не черный
+            if (red > 0) { 
                 if (x < minX) minX = x;
                 if (x > maxX) maxX = x;
                 if (y < minY) minY = y;
@@ -129,10 +135,17 @@ function getPixels(canvas) {
         }
     }
 
-    // Если холст пустой (ничего не нарисовано), возвращаем массив из 784 нулей
-    if (isEmpty) return new Array(784).fill(0);
+    // Берем наш новый маленький холст прямо со страницы
+    const networkCanvas = document.getElementById('networkInputCanvas');
+    const networkCtx = networkCanvas.getContext('2d');
 
-    // Вычисляем ширину и высоту нарисованной цифры
+    // Если ничего не нарисовано, очищаем маленький холст и возвращаем нули
+    if (isEmpty) {
+        networkCtx.fillStyle = 'black';
+        networkCtx.fillRect(0, 0, 28, 28);
+        return new Array(784).fill(0);
+    }
+
     const digitWidth = maxX - minX + 1;
     const digitHeight = maxY - minY + 1;
 
@@ -143,31 +156,24 @@ function getPixels(canvas) {
     const croppedCtx = croppedCanvas.getContext('2d');
     croppedCtx.drawImage(canvas, minX, minY, digitWidth, digitHeight, 0, 0, digitWidth, digitHeight);
 
-    // 3. Вычисляем масштаб, чтобы вписать цифру в размер 20x20 пикселей, сохраняя пропорции
+    // 3. Вычисляем масштаб (вписываем в 20x20)
     const scale = 20 / Math.max(digitWidth, digitHeight);
     const scaledWidth = digitWidth * scale;
     const scaledHeight = digitHeight * scale;
 
-    // 4. Создаем финальный холст 28x28 (как ожидает нейросеть)
-    const finalCanvas = document.createElement('canvas');
-    finalCanvas.width = 28;
-    finalCanvas.height = 28;
-    const finalCtx = finalCanvas.getContext('2d');
-    
-    // Обязательно заливаем фон черным
-    finalCtx.fillStyle = 'black';
-    finalCtx.fillRect(0, 0, 28, 28);
+    // 4. Обязательно заливаем фон видимого маленького холста черным
+    networkCtx.fillStyle = 'black';
+    networkCtx.fillRect(0, 0, 28, 28);
 
-    // 5. Размещаем сжатую цифру ровно по центру холста 28x28
+    // 5. Размещаем сжатую цифру ровно по центру на видимом маленьком холсте!
     const dx = (28 - scaledWidth) / 2;
     const dy = (28 - scaledHeight) / 2;
-    finalCtx.drawImage(croppedCanvas, 0, 0, digitWidth, digitHeight, dx, dy, scaledWidth, scaledHeight);
+    networkCtx.drawImage(croppedCanvas, 0, 0, digitWidth, digitHeight, dx, dy, scaledWidth, scaledHeight);
 
-    // 6. Получаем финальные пиксели
-    const finalData = finalCtx.getImageData(0, 0, 28, 28).data;
+    // 6. Получаем финальные пиксели прямо с видимого холста
+    const finalData = networkCtx.getImageData(0, 0, 28, 28).data;
     const pixels = [];
     
-    // Собираем значения от 0 до 1
     for (let i = 0; i < finalData.length; i += 4) {
         pixels.push(finalData[i] / 255.0);
     }
