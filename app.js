@@ -50,14 +50,37 @@ function clearCanvas(canvas, ctx) {
 }
 
 
-function initApp() {
+async function initApp() {
     const { canvas, ctx } = setupCanvas();
-    let isDrawing = false; // Переменная, которая помнит, рисуем мы сейчас или нет
+    let isDrawing = false;
     
-    // Очищаем холст при старте, чтобы он был гарантированно черным
+    // Переменная для хранения наших натренированных весов
+    let weights = null;
+
     clearCanvas(canvas, ctx);
 
-    // Добавляем "слушателей" событий мыши
+    // Пытаемся загрузить веса из файла weights.json
+    try {
+        const response = await fetch('weights.json');
+        weights = await response.json();
+        console.log("Веса успешно загружены!");
+    } catch (error) {
+        console.error("Ошибка загрузки весов:", error);
+        document.getElementById('predictionText').innerText = "Ошибка загрузки весов";
+    }
+
+    // Функция, которая объединяет получение пикселей и работу нейросети
+    function makePrediction() {
+        if (!weights) return; // Если веса еще не скачались, ничего не делаем
+        
+        const pixels = getPixels(canvas);
+        const probabilities = forwardPropJS(pixels, weights.W1, weights.b1, weights.W2, weights.b2);
+        const predictedDigit = argmax(probabilities);
+        
+        // Выводим результат на экран
+        document.getElementById('predictionText').innerText = `Предсказание: ${predictedDigit}`;
+    }
+
     canvas.addEventListener('mousedown', (e) => {
         isDrawing = startDrawing(e, ctx);
     });
@@ -68,13 +91,14 @@ function initApp() {
 
     canvas.addEventListener('mouseup', () => {
         isDrawing = stopDrawing(ctx);
+        // Как только закончили рисовать линию - делаем предсказание!
+        makePrediction(); 
     });
 
     canvas.addEventListener('mouseout', () => {
         isDrawing = stopDrawing(ctx);
     });
 
-    // Настраиваем кнопку очистки
     const clearBtn = document.getElementById('clearBtn');
     clearBtn.addEventListener('click', () => {
         clearCanvas(canvas, ctx);
@@ -112,6 +136,63 @@ function getPixels(canvas) {
     
     // Возвращаем готовый массив из 784 чисел
     return pixels;
+}
+
+function relu(vector) {
+    // Проходим по каждому числу в массиве. Если оно меньше 0, делаем его 0.
+    return vector.map(val => Math.max(0, val));
+}
+
+function softmax(vector) {
+    // Находим максимальное значение (полезно для стабильности вычислений)
+    const maxVal = Math.max(...vector); 
+    // Возводим в экспоненту
+    const exps = vector.map(val => Math.exp(val - maxVal));
+    // Считаем сумму всех экспонент
+    const sumExps = exps.reduce((a, b) => a + b, 0);
+    // Делим каждое значение на сумму, получая вероятности от 0 до 1
+    return exps.map(val => val / sumExps);
+}
+
+function matrixVectorMultiplyAndAdd(matrix, vector, bias) {
+    const result = [];
+    // Проходим по каждой строке матрицы (весов)
+    for (let i = 0; i < matrix.length; i++) {
+        let sum = 0;
+        // Умножаем на пиксели картинки
+        for (let j = 0; j < vector.length; j++) {
+            sum += matrix[i][j] * vector[j];
+        }
+        // Добавляем смещение (bias). В JSON это массив массивов (n x 1), берем первый элемент
+        result.push(sum + bias[i][0]);
+    }
+    return result;
+}
+
+function forwardPropJS(X, W1, b1, W2, b2) {
+    // Повторяем логику Python: сначала первый слой и ReLU
+    const Z1 = matrixVectorMultiplyAndAdd(W1, X, b1);
+    const A1 = relu(Z1);
+    
+    // Затем второй слой и Softmax
+    const Z2 = matrixVectorMultiplyAndAdd(W2, A1, b2);
+    const A2 = softmax(Z2);
+    
+    // Возвращаем массив вероятностей для каждой цифры
+    return A2;
+}
+
+function argmax(vector) {
+    // Ищем индекс самого большого числа в массиве (это и есть наша угаданная цифра)
+    let maxIndex = 0;
+    let maxValue = vector[0];
+    for (let i = 1; i < vector.length; i++) {
+        if (vector[i] > maxValue) {
+            maxValue = vector[i];
+            maxIndex = i;
+        }
+    }
+    return maxIndex;
 }
 
 // Запускаем наше приложение, как только страница загрузится
