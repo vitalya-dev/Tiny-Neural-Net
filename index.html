@@ -13,13 +13,37 @@
             margin-top: 50px;
             background-color: #f4f4f9;
         }
-        /* Стили для нашего холста: делаем ему строгую черную рамку */
+        /* Контейнер, чтобы выстроить холсты в один ряд */
+        .canvas-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
         #paintCanvas {
             border: 2px solid #333;
             background-color: black;
-            cursor: crosshair; /* Курсор в виде крестика для удобного рисования */
+            cursor: crosshair;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        /* Обертка для маленького холста и его подписи */
+        .small-canvas-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* Наш новый холст для визуализации */
+        #networkInputCanvas {
+            border: 1px solid #999;
+            background-color: black;
+            width: 112px;  /* Визуально увеличиваем в 4 раза (28 * 4) */
+            height: 112px;
+            image-rendering: pixelated; /* Показываем четкие пиксели */
+        }
+        .small-canvas-wrapper span {
+            font-size: 12px;
+            color: #555;
+            margin-top: 8px;
         }
         .controls {
             margin-top: 20px;
@@ -48,17 +72,23 @@
 
     <h1>Нарисуй цифру от 0 до 9</h1>
     
-    <!-- Наш холст для рисования размером 200x200 пикселей -->
-    <canvas id="paintCanvas" width="200" height="200"></canvas>
+    <div class="canvas-container">
+        <!-- Наш большой холст для рисования -->
+        <canvas id="paintCanvas" width="200" height="200"></canvas>
+        
+        <!-- Новый холст для того, что видит нейросеть -->
+        <div class="small-canvas-wrapper">
+            <canvas id="networkInputCanvas" width="28" height="28"></canvas>
+            <span>Взгляд сети (28x28)</span>
+        </div>
+    </div>
     
     <div class="controls">
         <button id="clearBtn">Очистить холст</button>
     </div>
     
-    <!-- Здесь будет появляться предсказание нейросети -->
     <h2 id="predictionText">Предсказание: ?</h2>
 
-    <!-- Подключаем будущий скрипт с логикой (пока его нет, но скоро мы его напишем) -->
     <script src="app.js"></script>
 
 </body>
