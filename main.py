@@ -58,12 +58,15 @@ def ReLU(Z):
     # Если число меньше нуля, оно станет нулем.
     return np.maximum(Z, 0)
 
+def deriv_ReLU(Z):
+    # Возвращает True (1), если Z > 0, и False (0), если Z <= 0
+    return Z > 0
+
 def softmax(Z):
     # Возводим в экспоненту и делим на сумму по столбцам (axis=0).
     # Так мы получаем вероятности для каждой цифры.
     A = np.exp(Z) / sum(np.exp(Z))
     return A
-
 
 def conv2d_forward(X, W, b):
     # X имеет форму (количество_картинок, каналы=1, высота=28, ширина=28)
@@ -137,6 +140,59 @@ def forward_prop(W1, b1, W2, b2, X):
     # Возвращаем все промежуточные результаты, они критически понадобятся для шага назад!
     return Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2
 
+def maxpool2d_backward(dA_pool, A_conv, size=2, stride=2):
+    # dA_pool - это ошибка, пришедшая от выходного слоя
+    # A_conv - это картинки до сжатия (чтобы мы помнили, где были яркие пиксели)
+    m, c, h_out, w_out = dA_pool.shape
+    
+    # Создаем пустую матрицу градиентов размером с исходную несжатую картинку
+    dA_conv = np.zeros_like(A_conv)
+    
+    # Снова проходим окном по картинкам
+    for h in range(h_out):
+        for w in range(w_out):
+            h_start = h * stride
+            w_start = w * stride
+            
+            # Берем кусочек 2x2, который мы сжимали
+            A_slice = A_conv[:, :, h_start:h_start+size, w_start:w_start+size]
+            
+            # Находим, какое значение в этом кусочке было максимальным
+            max_vals = np.max(A_slice, axis=(2, 3), keepdims=True)
+            
+            # Создаем "маску" (True там, где был максимум, и False в остальных местах)
+            mask = (A_slice == max_vals)
+            
+            # Передаем ошибку только победителям (умножаем маску на ошибку)
+            dA_pool_slice = dA_pool[:, :, h, w].reshape(m, c, 1, 1)
+            dA_conv[:, :, h_start:h_start+size, w_start:w_start+size] += mask * dA_pool_slice
+            
+    return dA_conv
+
+def conv2d_backward(dZ_conv, X, W):
+    # Эта функция вычисляет, как нужно изменить наши фильтры (dW)
+    m, f_num, h_out, w_out = dZ_conv.shape
+    f_num, c_prev, f_h, f_w = W.shape
+    
+    # Пустые матрицы для новых градиентов фильтров и смещений
+    dW = np.zeros_like(W)
+    db = np.sum(dZ_conv, axis=(0, 2, 3)).reshape(f_num, 1, 1)
+    
+    # Проходим по всем позициям, где был фильтр
+    for h in range(h_out):
+        for w in range(w_out):
+            # Берем кусок исходной картинки
+            X_slice = X[:, :, h:h+f_h, w:w+f_w]
+            # Берем ошибку для этой позиции
+            dZ_slice = dZ_conv[:, :, h, w]
+            
+            # Умножаем ошибку на картинку и добавляем к градиенту фильтра
+            dW += np.tensordot(dZ_slice, X_slice, axes=([0], [0]))
+            
+    # Мы не считаем градиент для самой картинки X, потому что это входные данные, 
+    # и дальше назад передавать ошибку некуда. Это экономит ресурсы!
+    return dW, db
+
 def one_hot(Y):
     # Создаем матрицу из нулей размером (количество картинок, 10 цифр)
     one_hot_Y = np.zeros((Y.size, Y.max() + 1))
@@ -145,152 +201,33 @@ def one_hot(Y):
     # Переворачиваем матрицу (транспонируем), чтобы столбцы стали картинками
     return one_hot_Y.T
 
-def deriv_ReLU(Z):
-    # Возвращает True (1), если Z > 0, и False (0), если Z <= 0
-    return Z > 0
-
-def backward_prop(Z1, A1, Z2, A2, W1, W2, X, Y):
-    # m - количество картинок в нашем наборе
+def backward_prop(Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2, W1, W2, X, Y):
     m = Y.size
-    
-    # Превращаем правильные ответы в формат из 0 и 1
     one_hot_Y = one_hot(Y)
     
-    # Считаем ошибку на выходном слое (Предсказание минус правильный ответ)
+    # 1. Шаг назад через выходной полносвязный слой (как было раньше)
     dZ2 = A2 - one_hot_Y
-    # Считаем, как нужно изменить веса и смещения второго слоя
-    dW2 = 1 / m * dZ2.dot(A1.T)
+    dW2 = 1 / m * dZ2.dot(A1_flat.T)
     db2 = 1 / m * np.sum(dZ2, axis=1, keepdims=True)
     
-    # Переносим ошибку на скрытый слой, умножая на веса W2 (в обратную сторону)
-    # и применяем производную от функции активации ReLU
-    dZ1 = W2.T.dot(dZ2) * deriv_ReLU(Z1)
-    # Считаем, как нужно изменить веса и смещения первого слоя
-    dW1 = 1 / m * dZ1.dot(X.T)
-    db1 = 1 / m * np.sum(dZ1, axis=1, keepdims=True)
+    # 2. Передаем ошибку от полносвязного слоя обратно к слою пулинга.
+    # Ошибка dZ2 имеет форму (10, m). Мы умножаем её на веса W2, чтобы получить ошибку для 1352 пикселей.
+    dA1_flat = W2.T.dot(dZ2)
     
-    # Возвращаем градиенты (направления и силу изменения весов)
+    # 3. Превращаем плоскую линию ошибки обратно в 3D-квадратики (разворачиваем Flatten)
+    dA1_pool = dA1_flat.T.reshape(m, 8, 13, 13)
+    
+    # 4. Шаг назад через Max Pooling (передаем ошибку ярким пикселям)
+    dA1_conv = maxpool2d_backward(dA1_pool, A1_conv)
+    
+    # 5. Шаг назад через ReLU (отключаем градиент там, где значения были меньше нуля)
+    dZ1_conv = dA1_conv * deriv_ReLU(Z1_conv)
+    
+    # 6. Шаг назад через Свертку (считаем градиенты для наших фильтров 3x3)
+    dW1, db1 = conv2d_backward(dZ1_conv, X, W1)
+    
+    # Усредняем градиенты по количеству картинок в партии
+    dW1 = dW1 / m
+    db1 = db1 / m
+    
     return dW1, db1, dW2, db2
-
-def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
-    # Обновляем параметры, вычитая градиент, умноженный на скорость обучения (alpha)
-    W1 = W1 - alpha * dW1
-    b1 = b1 - alpha * db1    
-    W2 = W2 - alpha * dW2  
-    b2 = b2 - alpha * db2    
-    
-    # Возвращаем новые, немного улучшенные веса и смещения
-    return W1, b1, W2, b2
-
-def main():
-    X_train, Y_train, X_test, Y_test = load_mnist_idx(
-        "train-images-idx3-ubyte",
-        "train-labels-idx1-ubyte",
-        "t10k-images-idx3-ubyte",
-        "t10k-labels-idx1-ubyte"
-    )
-
-    print("X_train:", X_train.shape)
-    print("Y_train:", Y_train.shape)
-    print("X_test: ", X_test.shape)
-    print("Y_test: ", Y_test.shape)
-
-    print()
-    print("Первая метка:", Y_train[0])
-    print("Первые 10 пикселей:", X_train[:10, 0])
-    print("Минимальный пиксель:", X_train.min())
-    print("Максимальный пиксель:", X_train.max())
-
-def get_predictions(A2):
-    # Функция argmax находит индекс самого большого числа в столбце.
-    # Поскольку индексы совпадают с цифрами (0-9), это и есть предсказанная цифра.
-    return np.argmax(A2, 0)
-
-def get_accuracy(predictions, Y):
-    # Сравниваем массивы предсказаний и правильных ответов (получаем значения True/False).
-    # Суммируем совпадения и делим на общее число картинок.
-    return np.sum(predictions == Y) / Y.size
-
-
-def gradient_descent(X, Y, alpha, iterations):
-    # 1. Задаем стартовые случайные веса и смещения
-    W1, b1, W2, b2 = init_params()
-    
-    # 2. Запускаем цикл обучения
-    for i in range(iterations):
-        # Шаг 1: Прямое распространение (сеть делает предсказание)
-        Z1, A1, Z2, A2 = forward_prop(W1, b1, W2, b2, X)
-        
-        # Шаг 2: Обратное распространение (сеть считает ошибки и градиенты)
-        dW1, db1, dW2, db2 = backward_prop(Z1, A1, Z2, A2, W1, W2, X, Y)
-        
-        # Шаг 3: Обновление параметров (сеть корректирует веса)
-        W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
-        
-        # Каждые 10 итераций выводим прогресс на экран
-        if i % 10 == 0:
-            print("Итерация: ", i)
-            predictions = get_predictions(A2)
-            print("Точность на обучающей выборке: ", get_accuracy(predictions, Y))
-            
-    # Возвращаем натренированные веса! Теперь они содержат знания сети.
-    return W1, b1, W2, b2
-
-def save_weights(W1, b1, W2, b2, filename="weights.json"):
-    import json
-    # Превращаем numpy матрицы в обычные списки Python, 
-    # потому что JSON не умеет работать с сырыми массивами numpy
-    data = {
-        "W1": W1.tolist(),
-        "b1": b1.tolist(),
-        "W2": W2.tolist(),
-        "b2": b2.tolist()
-    }
-    
-    # Открываем файл на запись ('w' - write) и сохраняем туда наши данные
-    with open(filename, 'w') as f:
-        json.dump(data, f)
-    
-    print(f"Веса успешно сохранены в файл: {filename}")
-
-def make_predictions(X, W1, b1, W2, b2):
-    # Запускаем только прямое распространение (без обучения) на новых данных X
-    _, _, _, A2 = forward_prop(W1, b1, W2, b2, X)
-    
-    # Превращаем вероятности в конкретные цифры-ответы
-    predictions = get_predictions(A2)
-    
-    # Возвращаем массив с предсказанными цифрами
-    return predictions
-
-
-if __name__ == "__main__":
-    # Указываем пути к бинарным файлам MNIST
-    train_images_path = 'train-images-idx3-ubyte'
-    train_labels_path = 'train-labels-idx1-ubyte'
-    test_images_path = 't10k-images-idx3-ubyte'
-    test_labels_path = 't10k-labels-idx1-ubyte'
-    
-    print("Загрузка данных...")
-    X_train, Y_train, X_test, Y_test = load_mnist_idx(
-        train_images_path, train_labels_path, test_images_path, test_labels_path
-    )
-    
-    print("Данные загружены. Начинаем обучение...")
-    # Запускаем обучение на 500 итераций
-    W1, b1, W2, b2 = gradient_descent(X_train, Y_train, 0.10, 10000)
-    print("Обучение завершено!")
-    
-    print("---")
-    print("Начинаем тестирование на новых данных (X_test)...")
-    
-    # Делаем предсказания на тестовых данных, которые сеть еще не видела
-    test_predictions = make_predictions(X_test, W1, b1, W2, b2)
-    
-    # Считаем и выводим итоговую точность
-    test_acc = get_accuracy(test_predictions, Y_test)
-    print(f"Итоговая точность на тестовой выборке: {test_acc * 100:.2f}%")
-    
-    print("---")
-    # Сохраняем натренированные веса для нашего будущего веб-интерфейса
-    save_weights(W1, b1, W2, b2, "weights.json")
