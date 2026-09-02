@@ -280,6 +280,24 @@ def make_predictions(X, W1, b1, W2, b2):
     predictions = get_predictions(A2)
     return predictions
 
+def save_weights(W1, b1, W2, b2, filename="weights.json"):
+    import json
+    # Превращаем numpy матрицы в обычные списки Python, 
+    # потому что JSON не умеет работать с сырыми массивами numpy
+    data = {
+        "W1": W1.tolist(),
+        "b1": b1.tolist(),
+        "W2": W2.tolist(),
+        "b2": b2.tolist()
+    }
+    
+    # Открываем файл на запись ('w' - write) и сохраняем туда наши данные
+    with open(filename, 'w') as f:
+        json.dump(data, f)
+    
+    print(f"Веса успешно сохранены в файл: {filename}")
+
+
 if __name__ == "__main__":
     print("Загрузка данных...")
     X_train, Y_train, X_test, Y_test = load_mnist_idx(
@@ -287,17 +305,20 @@ if __name__ == "__main__":
         't10k-images-idx3-ubyte', 't10k-labels-idx1-ubyte'
     )
     
-    # БЕРЕМ ТОЛЬКО ЧАСТЬ ДАННЫХ ДЛЯ ТЕСТА (иначе цикл будет идти слишком долго)
-    X_train_small = X_train[:1000]
-    Y_train_small = Y_train[:1000]
+    # Ограничиваем выборку для скорости
+    X_train_small = X_train[:6000]
+    Y_train_small = Y_train[:6000]
     X_test_small = X_test[:200]
     Y_test_small = Y_test[:200]
     
     print("Данные готовы. Начинаем обучение CNN (это займет время)...")
-    # Запускаем на 50 итераций с шагом 0.1
     W1, b1, W2, b2 = gradient_descent(X_train_small, Y_train_small, 0.1, 50)
     
     print("---")
     print("Тестирование на новых данных...")
     test_predictions = make_predictions(X_test_small, W1, b1, W2, b2)
     print(f"Точность на тестовой выборке: {get_accuracy(test_predictions, Y_test_small) * 100:.2f}%")
+    
+    print("---")
+    # Сохраняем веса нашей CNN в отдельный файл
+    save_weights(W1, b1, W2, b2, "weights_cnn.json")
