@@ -171,11 +171,15 @@ def conv2d_backward(dZ_conv, X, W):
     return dW, db
 
 def one_hot(Y):
-    # Создаем матрицу из нулей размером (количество картинок, 10 цифр)
-    one_hot_Y = np.zeros((Y.size, Y.max() + 1))
-    # Ставим единицы в нужные столбцы, соответствующие правильным ответам
+    # Жестко фиксируем количество классов на 10.
+    # Теперь размер матрицы не зависит от случайного состава батча.
+    num_classes = 10
+    one_hot_Y = np.zeros((Y.size, num_classes))
+    
+    # Расставляем единицы в правильные колонки
     one_hot_Y[np.arange(Y.size), Y] = 1
-    # Переворачиваем матрицу (транспонируем), чтобы столбцы стали картинками
+    
+    # Транспонируем, чтобы столбцы стали картинками
     return one_hot_Y.T
 
 def forward_prop(W1, b1, W2, b2, X):
@@ -242,24 +246,41 @@ def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
     # Возвращаем новые, немного улучшенные веса и смещения
     return W1, b1, W2, b2
 
-def gradient_descent(X, Y, alpha, iterations):
-    # Инициализируем новые фильтры и веса
+def train_minibatch(X, Y, alpha, epochs, batch_size):
+    # 1. Задаем стартовые случайные веса и смещения
     W1, b1, W2, b2 = init_params()
     
-    for i in range(iterations):
-        # 1. Прямой проход (принимаем 6 переменных от новых слоев)
-        Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2 = forward_prop(W1, b1, W2, b2, X)
+    # m - общее количество всех доступных картинок (например, 60 000)
+    m = X.shape[0]
+    
+    # 2. Запускаем цикл по эпохам (одна эпоха = полный проход по всей базе)
+    for epoch in range(epochs):
         
-        # 2. Обратный проход (прокидываем ошибку через пулинг и фильтры)
-        dW1, db1, dW2, db2 = backward_prop(Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2, W1, W2, X, Y)
+        # Перемешиваем данные перед каждой эпохой, чтобы сеть не заучивала порядок картинок
+        permutation = np.random.permutation(m)
+        X_shuffled = X[permutation]
+        Y_shuffled = Y[permutation]
         
-        # 3. Обновление весов (функция остается без изменений)
-        W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
-        
-        if i % 10 == 0:
-            print(f"Итерация: {i}")
-            predictions = get_predictions(A2)
-            print(f"Точность на обучающей выборке: {get_accuracy(predictions, Y):.4f}")
+        # 3. Нарезаем базу на батчи и идем по каждому из них
+        for i in range(0, m, batch_size):
+            # Вырезаем кусочек данных размером batch_size (например, 64 штуки)
+            X_batch = X_shuffled[i:i + batch_size]
+            Y_batch = Y_shuffled[i:i + batch_size]
+            
+            # Шаг 1: Прямое распространение только для этого батча
+            Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2 = forward_prop(W1, b1, W2, b2, X_batch)
+            
+            # Шаг 2: Обратное распространение (считаем градиенты для батча)
+            dW1, db1, dW2, db2 = backward_prop(Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2, W1, W2, X_batch, Y_batch)
+            
+            # Шаг 3: Обновляем параметры! Теперь мы делаем это очень часто, а не раз в эпоху.
+            W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
+            
+        # Чтобы не тратить время на проверку всей базы в 60к картинок, 
+        # выводим точность только на последнем батче текущей эпохи
+        predictions = get_predictions(A2)
+        acc = get_accuracy(predictions, Y_batch)
+        print(f"Эпоха: {epoch + 1}/{epochs} завершена. Точность на последнем батче: {acc * 100:.2f}%")
             
     return W1, b1, W2, b2
 
@@ -305,20 +326,17 @@ if __name__ == "__main__":
         't10k-images-idx3-ubyte', 't10k-labels-idx1-ubyte'
     )
     
-    # Ограничиваем выборку для скорости
-    X_train_small = X_train[:6000]
-    Y_train_small = Y_train[:6000]
-    X_test_small = X_test[:200]
-    Y_test_small = Y_test[:200]
-    
-    print("Данные готовы. Начинаем обучение CNN (это займет время)...")
-    W1, b1, W2, b2 = gradient_descent(X_train_small, Y_train_small, 0.1, 50)
+    print("Данные готовы. Начинаем обучение CNN на всех 60 000 картинках с мини-батчами...")
+    # Запускаем обучение:
+    # 5 эпох (5 раз пройдемся по всей базе)
+    # batch_size = 64 (по 64 картинки за шаг)
+    # alpha = 0.1 (скорость обучения)
+    W1, b1, W2, b2 = train_minibatch(X_train, Y_train, alpha=0.1, epochs=5, batch_size=64)
     
     print("---")
-    print("Тестирование на новых данных...")
-    test_predictions = make_predictions(X_test_small, W1, b1, W2, b2)
-    print(f"Точность на тестовой выборке: {get_accuracy(test_predictions, Y_test_small) * 100:.2f}%")
+    print("Тестирование на новых данных (10 000 картинок)...")
+    test_predictions = make_predictions(X_test, W1, b1, W2, b2)
+    print(f"Итоговая точность на тестовой выборке: {get_accuracy(test_predictions, Y_test) * 100:.2f}%")
     
     print("---")
-    # Сохраняем веса нашей CNN в отдельный файл
     save_weights(W1, b1, W2, b2, "weights_cnn.json")
