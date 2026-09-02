@@ -117,29 +117,6 @@ def maxpool2d_forward(X, size=2, stride=2):
             
     return A
 
-def forward_prop(W1, b1, W2, b2, X):
-    # 1. Слой свертки: ищем линии и узоры
-    Z1_conv = conv2d_forward(X, W1, b1)
-    
-    # 2. Функция активации ReLU: убираем отрицательные числа
-    A1_conv = ReLU(Z1_conv)
-    
-    # 3. Слой пулинга: сжимаем картинку 26x26 в 13x13 для ускорения
-    A1_pool = maxpool2d_forward(A1_conv)
-    
-    # 4. Вытягивание (Flatten): превращаем 3D-карты признаков в плоскую линию.
-    # A1_pool имеет форму (m, 8, 13, 13). 
-    # Мы превращаем её в (1352, m), чтобы подать в классическую полносвязную сеть.
-    m = X.shape[0]
-    A1_flat = A1_pool.reshape(m, -1).T
-    
-    # 5. Выходной полносвязный слой: принимаем решение о цифре
-    Z2 = W2.dot(A1_flat) + b2
-    A2 = softmax(Z2)
-    
-    # Возвращаем все промежуточные результаты, они критически понадобятся для шага назад!
-    return Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2
-
 def maxpool2d_backward(dA_pool, A_conv, size=2, stride=2):
     # dA_pool - это ошибка, пришедшая от выходного слоя
     # A_conv - это картинки до сжатия (чтобы мы помнили, где были яркие пиксели)
@@ -201,6 +178,29 @@ def one_hot(Y):
     # Переворачиваем матрицу (транспонируем), чтобы столбцы стали картинками
     return one_hot_Y.T
 
+def forward_prop(W1, b1, W2, b2, X):
+    # 1. Слой свертки: ищем линии и узоры
+    Z1_conv = conv2d_forward(X, W1, b1)
+    
+    # 2. Функция активации ReLU: убираем отрицательные числа
+    A1_conv = ReLU(Z1_conv)
+    
+    # 3. Слой пулинга: сжимаем картинку 26x26 в 13x13 для ускорения
+    A1_pool = maxpool2d_forward(A1_conv)
+    
+    # 4. Вытягивание (Flatten): превращаем 3D-карты признаков в плоскую линию.
+    # A1_pool имеет форму (m, 8, 13, 13). 
+    # Мы превращаем её в (1352, m), чтобы подать в классическую полносвязную сеть.
+    m = X.shape[0]
+    A1_flat = A1_pool.reshape(m, -1).T
+    
+    # 5. Выходной полносвязный слой: принимаем решение о цифре
+    Z2 = W2.dot(A1_flat) + b2
+    A2 = softmax(Z2)
+    
+    # Возвращаем все промежуточные результаты, они критически понадобятся для шага назад!
+    return Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2
+
 def backward_prop(Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2, W1, W2, X, Y):
     m = Y.size
     one_hot_Y = one_hot(Y)
@@ -232,6 +232,15 @@ def backward_prop(Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2, W1, W2, X, Y):
     
     return dW1, db1, dW2, db2
 
+def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
+    # Обновляем параметры, вычитая градиент, умноженный на скорость обучения (alpha)
+    W1 = W1 - alpha * dW1
+    b1 = b1 - alpha * db1    
+    W2 = W2 - alpha * dW2  
+    b2 = b2 - alpha * db2    
+    
+    # Возвращаем новые, немного улучшенные веса и смещения
+    return W1, b1, W2, b2
 
 def gradient_descent(X, Y, alpha, iterations):
     # Инициализируем новые фильтры и веса
@@ -253,17 +262,6 @@ def gradient_descent(X, Y, alpha, iterations):
             print(f"Точность на обучающей выборке: {get_accuracy(predictions, Y):.4f}")
             
     return W1, b1, W2, b2
-
-def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
-    # Обновляем параметры, вычитая градиент, умноженный на скорость обучения (alpha)
-    W1 = W1 - alpha * dW1
-    b1 = b1 - alpha * db1    
-    W2 = W2 - alpha * dW2  
-    b2 = b2 - alpha * db2    
-    
-    # Возвращаем новые, немного улучшенные веса и смещения
-    return W1, b1, W2, b2
-
 
 def get_predictions(A2):
     # Функция argmax находит индекс самого большого числа в столбце.
