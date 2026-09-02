@@ -231,3 +231,75 @@ def backward_prop(Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2, W1, W2, X, Y):
     db1 = db1 / m
     
     return dW1, db1, dW2, db2
+
+
+def gradient_descent(X, Y, alpha, iterations):
+    # Инициализируем новые фильтры и веса
+    W1, b1, W2, b2 = init_params()
+    
+    for i in range(iterations):
+        # 1. Прямой проход (принимаем 6 переменных от новых слоев)
+        Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2 = forward_prop(W1, b1, W2, b2, X)
+        
+        # 2. Обратный проход (прокидываем ошибку через пулинг и фильтры)
+        dW1, db1, dW2, db2 = backward_prop(Z1_conv, A1_conv, A1_pool, A1_flat, Z2, A2, W1, W2, X, Y)
+        
+        # 3. Обновление весов (функция остается без изменений)
+        W1, b1, W2, b2 = update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha)
+        
+        if i % 10 == 0:
+            print(f"Итерация: {i}")
+            predictions = get_predictions(A2)
+            print(f"Точность на обучающей выборке: {get_accuracy(predictions, Y):.4f}")
+            
+    return W1, b1, W2, b2
+
+def update_params(W1, b1, W2, b2, dW1, db1, dW2, db2, alpha):
+    # Обновляем параметры, вычитая градиент, умноженный на скорость обучения (alpha)
+    W1 = W1 - alpha * dW1
+    b1 = b1 - alpha * db1    
+    W2 = W2 - alpha * dW2  
+    b2 = b2 - alpha * db2    
+    
+    # Возвращаем новые, немного улучшенные веса и смещения
+    return W1, b1, W2, b2
+
+
+def get_predictions(A2):
+    # Функция argmax находит индекс самого большого числа в столбце.
+    # Поскольку индексы совпадают с цифрами (0-9), это и есть предсказанная цифра.
+    return np.argmax(A2, 0)
+
+def get_accuracy(predictions, Y):
+    # Сравниваем массивы предсказаний и правильных ответов (получаем значения True/False).
+    # Суммируем совпадения и делим на общее число картинок.
+    return np.sum(predictions == Y) / Y.size
+
+def make_predictions(X, W1, b1, W2, b2):
+    # При предсказании нам нужен только финальный ответ A2, 
+    # остальные промежуточные данные игнорируем с помощью символа "_"
+    _, _, _, _, _, A2 = forward_prop(W1, b1, W2, b2, X)
+    predictions = get_predictions(A2)
+    return predictions
+
+if __name__ == "__main__":
+    print("Загрузка данных...")
+    X_train, Y_train, X_test, Y_test = load_mnist_idx(
+        'train-images-idx3-ubyte', 'train-labels-idx1-ubyte', 
+        't10k-images-idx3-ubyte', 't10k-labels-idx1-ubyte'
+    )
+    
+    # БЕРЕМ ТОЛЬКО ЧАСТЬ ДАННЫХ ДЛЯ ТЕСТА (иначе цикл будет идти слишком долго)
+    X_train_small = X_train[:1000]
+    Y_train_small = Y_train[:1000]
+    X_test_small = X_test[:200]
+    Y_test_small = Y_test[:200]
+    
+    print("Данные готовы. Начинаем обучение CNN (это займет время)...")
+    # Запускаем на 50 итераций с шагом 0.1
+    W1, b1, W2, b2 = gradient_descent(X_train_small, Y_train_small, 0.1, 50)
+    
+    print("---")
+    print("Тестирование на новых данных...")
+    test_predictions = make_predictions(X_test_small, W1, b1, W2, b2)
+    print(f"Точность на тестовой выборке: {get_accuracy(test_predictions, Y_test_small) * 100:.2f}%")
